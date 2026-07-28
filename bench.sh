@@ -39,7 +39,7 @@ POOL = [
     "Graben 12 Salzburg", "Bahnhofstrasse Zürich", "Rue Neuve Bruxelles",
     "Grand Rue Luxembourg", "Calea Victoriei Bucuresti", "Vitosha Boulevard Sofia",
     "Ban Jelacic Zagreb", "Presernov trg Ljubljana", "Vaci utca Budapest",
-    "Ermou Athina", "Istiklal Caddesi Istanbul", "Rossio Lisboa",
+    "Ermou Athens", "Istiklal Caddesi Istanbul", "Rossio Lisboa",
     "Las Ramblas Barcelona", "Puerta del Sol Madrid", "Corso Buenos Aires Milano",
     "Piazza Navona Roma", "Königsallee Düsseldorf", "Reeperbahn Hamburg",
     "Zeil Frankfurt", "Schildergasse Köln", "Maximilianstraße München",
