@@ -107,12 +107,30 @@ Then run on the new instance for a day. If anything is wrong:
 ./migrate.sh rollback    # nginx → 2322, old service untouched
 ```
 
-Once satisfied:
+Once satisfied — these are the irreversible ones:
 
 ```bash
-./migrate.sh cleanup     # stops 0.6.2, frees 175 GB on the volume
-                         # [asks: type 'decommission']
+./migrate.sh cleanup     # stops+disables 0.6.2, deletes the old index (frees
+                         # 175 GB on the volume), removes the /home/photon
+                         # leftovers, drops `discard` from fstab, arms
+                         # fstrim.timer          [asks: type 'decommission']
+
+./migrate.sh purge       # openjdk + ca-certificates-java (190 MB), 13 rc-state
+                         # kernels + orphaned module dirs (~61 MB), orphaned GUI
+                         # libs (~63 MB), apt cache and lists (~244 MB), journald
+                         # capped at 500 MB and vacuumed (~3.5 GB)
+                         #                        [asks: type 'purge']
+
+./migrate.sh rebootcheck # read-only: fstab valid, volume has nofail, vmlinuz +
+                         # initrd present for the newest kernel, docker/nginx/
+                         # certbot enabled, compose restart policy set,
+                         # old photon.service disabled
+reboot
 ```
+
+Both `cleanup` and `purge` refuse to run unless the new instance answers on 2323
+*and* nginx is actually pointing at it. `purge` additionally refuses to remove
+openjdk while `photon.service` is still running.
 
 ### Notes on individual stages
 
@@ -128,16 +146,11 @@ Once satisfied:
 
 ## After cleanup
 
-Two leftovers from the old setup worth fixing while you are in there:
-
-```bash
-# 1. Drop the `discard` mount option — inline TRIM in the I/O path on a network
-#    volume. Edit /etc/fstab, remove `discard` from the /mnt/photon-data line.
-systemctl enable --now fstrim.timer
-
-# 2. The volume is now staging/backup only. You need ~62 GB free there to stage
-#    a future dump. You will have 175 GB. Consider shrinking it.
-```
+`cleanup` handles the `discard` → `fstrim.timer` swap itself (backing up
+`/etc/fstab` and validating with `findmnt --verify`, restoring the backup if
+that fails). What is left is a decision, not a command: the volume is now
+staging/backup only, and you need ~62 GB free there to stage a future dump.
+You will have 175 GB, so consider shrinking it.
 
 The nginx config also turns `access_log` back on with `$request_time` and
 `$upstream_cache_status`, so the next round of this is measurable rather than
