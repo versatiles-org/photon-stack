@@ -25,3 +25,14 @@ updates:
       interval: weekly
     commit-message:
       prefix: "chore(deps)"
+
+  # The nginx and certbot images in docker-compose.yml. Photon's own image is
+  # named there by a variable (PHOTON_VERSION), which Dependabot leaves alone.
+  # Not grouped: each image gets a pull request of its own that can be tested
+  # and merged independently (nginx bumps run tests/nginx-config.sh).
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore(deps)"

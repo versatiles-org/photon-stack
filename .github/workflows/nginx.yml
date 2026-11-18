@@ -1,0 +1,37 @@
+name: nginx
+
+# Loads the nginx configuration in the image docker-compose.yml pins
+# (tests/nginx-config.sh): every change under nginx/, and every nginx image
+# bump Dependabot proposes, is checked with `nginx -t` before it reaches the
+# server.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'nginx/**'
+      - 'docker-compose.yml'
+      - 'tests/nginx-config.sh'
+      - '.github/workflows/nginx.yml'
+  pull_request:
+    paths:
+      - 'nginx/**'
+      - 'docker-compose.yml'
+      - 'tests/nginx-config.sh'
+      - '.github/workflows/nginx.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  config:
+    name: nginx -t
+    # arm64, the platform of geocode.versatiles.org.
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Test the nginx configuration
+        run: tests/nginx-config.sh
