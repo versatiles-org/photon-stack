@@ -137,9 +137,10 @@ server {
       proxy_pass http://photon;
 
       proxy_cache photon_cache;
-      # Answers change only with a new index, and an index update clears the
-      # cache. 7 days instead of 6 hours turns repeated queries (a batch client
-      # repeats its whole set every few hours) into hits instead of refreshes.
+      # Answers change only with a new index (bin/index/update.sh, which leaves
+      # this cache alone: old answers expire within these 7 days). 7 days
+      # instead of 6 hours turns repeated queries (a batch client repeats its
+      # whole set every few hours) into hits instead of refreshes.
       proxy_cache_valid 200 7d;
       proxy_cache_valid 400 404 1m;
       # Photon sends no cache headers; make caching deterministic.

@@ -3,7 +3,7 @@ name: Image
 # Builds the Photon image, tests it on amd64 and arm64 against a real index
 # (tests/smoke.sh), and on main publishes it to ghcr.io/versatiles-org/photon.
 #
-# Tags: the Photon version (e.g. `1.2.1`, what docker-compose.yml runs), `latest`,
+# Tags: the Photon version (e.g. `1.3.0`, what docker-compose.yml runs), `latest`,
 # and `sha-<commit>`. A rebuild of the same Photon version (a new base image,
 # say) moves the version tag; the sha tag of the build before stays, so going
 # back is a matter of naming that tag in PHOTON_VERSION.

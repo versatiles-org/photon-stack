@@ -3,7 +3,7 @@
 # the geocoder is measured in isolation.
 #
 #   ./bench.sh 2322            # one instance
-#   ./bench.sh 2322 2323       # old vs new, same query set
+#   ./bench.sh 2322 2323       # two instances, same query set
 #
 # "cold" = queries the instance has not seen; those hit the disk-bound index
 # and are what users actually feel.
