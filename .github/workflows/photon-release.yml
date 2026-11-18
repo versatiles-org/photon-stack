@@ -1,0 +1,70 @@
+name: Photon release check
+
+# Dependabot cannot see the Photon jar (a GitHub release asset, not a package),
+# so this checks once a week whether komoot/photon has released a version newer
+# than the Dockerfile's, and opens an issue with everything the upgrade needs.
+# One issue per version: if one with the same title exists (open or closed),
+# nothing is opened again.
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    name: Check for a new Photon release
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Compare with the latest release
+        run: |
+          CURRENT=$(sed -n 's/^ARG PHOTON_VERSION=//p' Dockerfile)
+          LATEST=$(gh api repos/komoot/photon/releases/latest --jq .tag_name)
+          echo "Dockerfile: $CURRENT, latest release: $LATEST"
+
+          NEWEST=$(printf '%s\n%s\n' "$CURRENT" "$LATEST" | sort -V | tail -1)
+          if [ "$LATEST" = "$CURRENT" ] || [ "$NEWEST" != "$LATEST" ]; then
+            echo "Up to date."
+            exit 0
+          fi
+
+          TITLE="Photon $LATEST is available"
+          if [ -n "$(gh issue list --repo "$GITHUB_REPOSITORY" --state all --search "\"$TITLE\" in:title" --json number --jq '.[].number')" ]; then
+            echo "An issue for $LATEST exists already."
+            exit 0
+          fi
+
+          DIGEST=$(gh api "repos/komoot/photon/releases/tags/$LATEST" \
+            --jq ".assets[] | select(.name == \"photon-$LATEST.jar\") | .digest")
+          if [ -z "$DIGEST" ]; then
+            echo "::error::Release $LATEST has no asset photon-$LATEST.jar with a digest."
+            exit 1
+          fi
+
+          {
+            echo "komoot/photon released [$LATEST](https://github.com/komoot/photon/releases/tag/$LATEST). The image builds $CURRENT."
+            echo
+            echo "To upgrade, set in the \`Dockerfile\`:"
+            echo
+            echo '```dockerfile'
+            echo "ARG PHOTON_VERSION=$LATEST"
+            echo "ARG PHOTON_SHA256=${DIGEST#sha256:}"
+            echo '```'
+            echo
+            echo "Then:"
+            echo
+            echo "1. Read the [release notes](https://github.com/komoot/photon/releases/tag/$LATEST) for changes to the index format or to the command line."
+            echo "2. Open a pull request: the Image workflow builds it and runs the smoke test on amd64 and arm64."
+            echo "3. After the merge, set \`PHOTON_VERSION=$LATEST\` in \`.env\` on the server, then \`docker compose pull && docker compose up -d\`."
+          } > body.md
+
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file body.md
