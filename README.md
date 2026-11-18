@@ -122,6 +122,7 @@ tests/smoke.sh photon-test
 | `volumes/`                   | certificates and ACME challenges, written on the server, not committed                |
 | `bench.sh`                   | cold/warm latency measurement                                                         |
 | [MIGRATION.md](MIGRATION.md) | the 0.6.2 → 1.2.1 migration this stack came out of                                    |
+| [CUTOVER.md](CUTOVER.md)     | the move from host nginx and host certbot into compose (November 2026)                |
 
 ## The one thing that determines performance
 
