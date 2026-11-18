@@ -1,1 +1,7 @@
 .bench-run
+
+# The server's own settings, copied from template.env.
+.env
+
+# Certificates, ACME challenges: written on the server, never committed.
+/volumes/

@@ -1,0 +1,154 @@
+# geocode.versatiles.org: TLS, a response cache and a rate limit in front of
+# Photon. Rendered by the nginx image at container start (envsubst replaces
+# ${DOMAIN_NAME}; nginx's own $variables have no environment variable of that
+# name and stay as they are).
+
+# The response cache. 4 GB is far more than needed: 79 MB after months of
+# traffic (November 2026).
+proxy_cache_path /var/cache/nginx/photon
+                 levels=1:2
+                 keys_zone=photon_cache:20m
+                 max_size=4g
+                 inactive=7d
+                 use_temp_path=off;
+
+# One line per request, to the container log (`docker compose logs nginx`;
+# Docker rotates it, see `logging` in docker-compose.yml). No query string: for
+# a geocoder that is the search text, often someone's address. The client
+# address is anonymised (map in nginx.conf).
+log_format photon_fmt '$remote_addr_anon [$time_iso8601] "$request_method $uri" '
+                      '$status $body_bytes_sent '
+                      'rt=$request_time urt=$upstream_response_time '
+                      'cache=$upstream_cache_status';
+
+# Rate-limited requests (429) tell the client when to come back. Empty for
+# every other status: nginx sends no header for an empty value.
+map $status $retry_after {
+   429     1;
+   default "";
+}
+
+# `resolve` follows Docker's DNS instead of looking the name up once at start:
+# a recreated Photon container gets a new address. ipv6=off: Photon listens on
+# IPv4 only, but the network has IPv6, so the name has an IPv6 address too.
+upstream photon {
+   zone photon 64k;
+   resolver 127.0.0.11 valid=1s ipv6=off;
+   resolver_timeout 2s;
+   server photon:2322 resolve;
+   keepalive 32;
+   keepalive_timeout 60s;
+}
+
+server {
+   # default_server: requests by IP address or for another host name end up
+   # here too (there is no other site on this server).
+   listen 80 default_server;
+   listen [::]:80 default_server;
+   server_name ${DOMAIN_NAME};
+
+   # Also on the redirect: a browser follows it only if it may read it.
+   add_header Access-Control-Allow-Origin "*" always;
+
+   # certbot's HTTP challenge (bin/cert/renew.sh).
+   location /.well-known/acme-challenge/ {
+      root /var/www/certbot;
+   }
+
+   # For the container healthcheck: answered locally, without the redirect.
+   location = /healthz {
+      access_log off;
+      return 204;
+   }
+
+   location / {
+      return 301 https://${DOMAIN_NAME}$request_uri;
+   }
+}
+
+server {
+   listen 443 ssl default_server;
+   listen [::]:443 ssl default_server;
+   http2 on;
+   server_name ${DOMAIN_NAME};
+
+   ssl_certificate     /etc/letsencrypt/live/${DOMAIN_NAME}/fullchain.pem;
+   ssl_certificate_key /etc/letsencrypt/live/${DOMAIN_NAME}/privkey.pem;
+   ssl_protocols TLSv1.2 TLSv1.3;
+   # For TLS 1.2 (TLS 1.3 has its own fixed set): forward-secret AEAD suites
+   # only, so no DH parameters are needed. ChaCha20 is for devices without AES
+   # hardware support.
+   ssl_ciphers 'EECDH+AESGCM:EECDH+CHACHA20';
+   ssl_session_cache shared:SSL:10m;
+   ssl_session_timeout 10m;
+   ssl_session_tickets off;
+   # No OCSP stapling: Let's Encrypt no longer runs an OCSP responder.
+
+   access_log /dev/stdout photon_fmt;
+   charset utf-8;
+
+   # `always`, so error responses (429, 502) carry them too. Keep every
+   # add_header here: one inside a location drops all of these for it.
+   add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+   add_header X-Content-Type-Options "nosniff" always;
+   # Nothing on this host belongs in a search index: `/` is empty and the rest
+   # are API answers.
+   add_header X-Robots-Tag "noindex" always;
+   # CORS for every response, including the 429 and 502 nginx answers itself;
+   # Photon's own header (-cors-any) is hidden below so it is not sent twice.
+   add_header Access-Control-Allow-Origin "*" always;
+   # HIT / MISS / STALE / UPDATING; none for what nginx answers itself.
+   add_header X-Cache-Status $upstream_cache_status always;
+   add_header Retry-After $retry_after always;
+
+   # For every location that proxies to Photon.
+   proxy_http_version    1.1;
+   # Required for upstream keepalive to actually be used.
+   proxy_set_header      Connection "";
+   proxy_set_header      Host $host;
+   proxy_connect_timeout 2s;
+   proxy_send_timeout    15s;
+   # Photon's own -query-timeout is 5s; this is the outer bound.
+   proxy_read_timeout    15s;
+   proxy_hide_header     Access-Control-Allow-Origin;
+
+   location = / {
+      return 204;
+   }
+
+   # Search engines may fetch `/` (and see its noindex, which is what removes it
+   # from the index; a URL blocked here would stay in it), but not the API:
+   # every query is a URL of its own, and each one costs a Photon lookup.
+   location = /robots.txt {
+      default_type text/plain;
+      return 200 "User-agent: *\nDisallow: /api\nDisallow: /reverse\n";
+   }
+
+   # Photon's own state, never from the cache: for the uptime monitor, which
+   # otherwise sees cached answers, or stale ones while Photon is down
+   # (proxy_cache_use_stale below).
+   location = /status {
+      limit_req zone=clients burst=30 nodelay;
+      proxy_pass http://photon;
+   }
+
+   location / {
+      limit_req zone=clients burst=30 nodelay;
+      proxy_pass http://photon;
+
+      proxy_cache photon_cache;
+      # Answers change only with a new index, and an index update clears the
+      # cache. 7 days instead of 6 hours turns repeated queries (a batch client
+      # repeats its whole set every few hours) into hits instead of refreshes.
+      proxy_cache_valid 200 7d;
+      proxy_cache_valid 400 404 1m;
+      # Photon sends no cache headers; make caching deterministic.
+      proxy_ignore_headers Cache-Control Expires Set-Cookie;
+      # Collapse concurrent identical misses into one upstream request. Matters
+      # a lot when a cold query costs hundreds of ms.
+      proxy_cache_lock on;
+      proxy_cache_lock_timeout 10s;
+      proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
+      proxy_cache_background_update on;
+   }
+}

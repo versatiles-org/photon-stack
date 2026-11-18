@@ -1,3 +1,9 @@
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
 services:
   photon:
     # Built and published by .github/workflows/image.yml. To try a local build
@@ -7,6 +13,7 @@ services:
     restart: unless-stopped
     # Must match the owner of the bind-mounted index directory on the host.
     user: "${PHOTON_UID}:${PHOTON_GID}"
+    networks: [geocode]
 
     # ---------------------------------------------------------------------
     # DO NOT ADD `mem_limit` / `deploy.resources.limits.memory` HERE.
@@ -25,6 +32,8 @@ services:
 
     # Appended to the image's PHOTON_ARGS (data dir, listen address and port).
     # -query-timeout caps pathological queries (`q=b` cost 6.3s on 0.6.2).
+    # CORS headers come from nginx, which hides Photon's; -cors-any is for
+    # direct access through the port below.
     command:
       - -cors-any
       - -query-timeout
@@ -40,20 +49,16 @@ services:
       - "${PHOTON_DATA_DIR}:/photon/data"
       - photon-tmp:/photon/tmp
 
-    # The image listens on 0.0.0.0 inside the container; this binds it to
-    # loopback on the host, so nothing is reachable from outside.
+    # nginx reaches Photon over the compose network. This port is only for
+    # bench.sh, which measures Photon without nginx and its cache: bound to
+    # loopback, so nothing is reachable from outside.
     ports:
       - "127.0.0.1:${PHOTON_HOST_PORT}:2322"
 
     # The healthcheck is the image's (Dockerfile: HEALTHCHECK on /status).
 
-    # The old setup produced a 392 MB unrotated photon.log. json-file would
-    # reproduce that faithfully without these caps.
-    logging:
-      driver: json-file
-      options:
-        max-size: "50m"
-        max-file: "3"
+    # The old setup produced a 392 MB unrotated photon.log.
+    logging: *logging
 
     ulimits:
       memlock: -1
@@ -61,5 +66,70 @@ services:
         soft: 65536
         hard: 65536
 
+  nginx:
+    image: nginx:1.31-alpine
+    container_name: nginx
+    restart: unless-stopped
+    # nginx.conf's worker_shutdown_timeout (1s) makes it exit within about 2s;
+    # this is the backstop. Docker's default of 10s would mean up to 11 seconds
+    # with nothing listening on 80/443 whenever the container is replaced.
+    stop_grace_period: 3s
+    # Started, not healthy: nginx answers /robots.txt, `/` and the redirect on
+    # its own, and finds Photon by name once Photon is up (`resolve`).
+    depends_on: [photon]
+    networks: [geocode]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # nginx.conf reaches the container through the directory mount below, not
+      # as a single file: see nginx/nginx.stub.conf.
+      - ./nginx/nginx.stub.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/:/etc/nginx/repo/:ro
+      - ./nginx/templates/:/etc/nginx/templates/:ro
+      # Written by the certbot service (bin/cert/renew.sh). The whole folder,
+      # because live/ holds symlinks into archive/.
+      - ./volumes/letsencrypt/:/etc/letsencrypt/:ro
+      - ./volumes/certbot-www/:/var/www/certbot/:ro
+      - nginx-cache:/var/cache/nginx/
+    environment:
+      DOMAIN_NAME: "${DOMAIN_NAME}"
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      # A local endpoint (/healthz in the template): whether nginx itself is
+      # serving, independent of DNS and of Photon.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging: *logging
+
+  # Not started by `docker compose up`: run on demand by bin/cert/renew.sh.
+  certbot:
+    image: certbot/certbot:v5.9.0
+    container_name: certbot
+    profiles: [donotstart]
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./volumes/letsencrypt/:/etc/letsencrypt/:rw
+      # /var/www, not /var/www/certbot: the renewal config carried over from
+      # the host certbot names /var/www as its webroot. nginx serves the same
+      # folder as /var/www/certbot, so the challenge files line up.
+      - ./volumes/certbot-www/:/var/www/:rw
+
+networks:
+  geocode:
+    driver: bridge
+    # Without IPv6 on the network, Docker forwards IPv6 connections to the
+    # published ports through its userland proxy, and nginx sees the bridge
+    # gateway instead of the client: one rate-limit bucket for every IPv6
+    # visitor (see tiles.versatiles.org#42). With it, Docker (27+) picks a
+    # unique local IPv6 subnet and publishes the ports with ip6tables NAT.
+    enable_ipv6: true
+
 volumes:
   photon-tmp:
+  nginx-cache:
