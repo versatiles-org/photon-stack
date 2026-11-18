@@ -108,7 +108,7 @@ services:
 
   # Not started by `docker compose up`: run on demand by bin/cert/renew.sh.
   certbot:
-    image: certbot/certbot:v5.9.0
+    image: certbot/certbot:v5.10.0
     container_name: certbot
     profiles: [donotstart]
     security_opt:
