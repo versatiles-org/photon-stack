@@ -5,7 +5,7 @@
 # The base image is pinned by digest: the tag alone moves with every Temurin and
 # Ubuntu update, so two builds of the same commit could differ. Dependabot bumps
 # the digest (.github/dependabot.yml).
-FROM eclipse-temurin:21-jre-noble@sha256:0d57a8e90c2bb844c5a8e1b2b71e11eff06dad7edcfd803cd21ed4ae203b2515
+FROM eclipse-temurin:25-jre-noble@sha256:e3b6f7887a50f20d8f07abf279d8a81a5953fb398a9555bd9edd56b9bd15968c
 
 # Bump both together. The checksum is the release asset's `digest` on GitHub:
 #   gh api repos/komoot/photon/releases/tags/<version> --jq '.assets[].digest'
