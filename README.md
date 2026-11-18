@@ -15,14 +15,13 @@ client ──► nginx :443 ──────────────► photon
 
 ## Quick start
 
-Needs Docker 27+ and a Photon index already extracted at
-`$PHOTON_DATA_DIR/photon_data` (~100 GB — see [MIGRATION.md](MIGRATION.md) for
-how to fetch one).
+Needs Docker 27+, `lbzip2`, and about 110 GB free for the planet index.
 
 ```bash
 cp template.env .env && $EDITOR .env    # domain, index path, version, heap
 # certificates: see "Certificates" below
 docker compose pull
+bin/index/update.sh                     # fetches the index, see "The index" below
 docker compose up -d
 docker compose logs -f photon           # opening a ~100 GB index takes a minute or more
 bin/cert/setup_renewal.sh               # weekly renewal from cron
@@ -76,6 +75,31 @@ To move an existing certificate from a host certbot, copy its folder before the
 first start: `cp -a /etc/letsencrypt/. volumes/letsencrypt/`. Its renewal
 config names `/var/www` as webroot, which is where the certbot container sees
 `volumes/certbot-www/`.
+
+## The index
+
+`bin/index/update.sh` installs the dump that `PHOTON_DUMP_URL` names
+(GraphHopper's planet dump by default, rebuilt about weekly). Run it as root.
+`--check` only reports whether the dump differs from the installed one.
+
+It replaces the index **in place**: the disk has no room for a second index
+next to the first (about 90 GB index, 50 GB free). So it stops Photon, deletes
+the old index and streams the dump straight into place, with no archive on
+disk. Meanwhile nginx answers only the searches in its cache, which in
+November 2026 was 99.6 % of requests; new searches get a `502`. Before
+stopping anything it checks that the dump is reachable, that it is not the one
+already installed (its MD5, kept in `$PHOTON_DATA_DIR/dump.md5`), and that it
+fits. A failed download is tried three times; after that Photon stays stopped
+without an index, and a new run starts over.
+
+Automatic updates are off. `bin/index/setup_auto_update.sh` turns them on: a
+cron job on the 1st of each month at 02:00, logging to
+`/var/log/photon-index-update.log`. Fine for a demo server; anything that
+cannot go without new searches for a while needs a second disk instead.
+
+Without `lbzip2` (`apt install lbzip2`) it falls back to single-threaded
+`bzip2`, several times slower. The nginx cache keeps answers from the old
+index for up to 7 days.
 
 ## The image
 
@@ -142,6 +166,7 @@ tar -C /var/lib/photon -xf /root/photon-state.tar
 | `entrypoint.sh`              | fails fast and loudly if the index bind-mount is missing                              |
 | `nginx/`                     | TLS, response cache, rate limit, `robots.txt`                                         |
 | `bin/cert/`                  | certificate renewal and its cron job                                                  |
+| `bin/index/`                 | index update, in place, and its opt-in cron job                                       |
 | `tests/`                     | `smoke.sh` (image against a small real index), `nginx-config.sh` (`nginx -t`)          |
 | `.github/`                   | CI, image publishing, Dependabot, weekly check for new Photon releases                |
 | `volumes/`                   | certificates and ACME challenges, written on the server, not committed                |
