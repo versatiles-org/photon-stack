@@ -9,7 +9,7 @@ languages. There is no official Photon image, so this repo builds a thin one,
 pins the version, and publishes it as `ghcr.io/versatiles-org/photon`.
 
 ```
-client ──► nginx :443 ──────────────► photon :2322 ──► ~100 GB index on local NVMe
+client ──► nginx :443 ──────────────► photon :2322 ──► ~92 GB index on local NVMe
            cache 4g/7d, 5 req/s/IP                     mmapped, served from page cache
 ```
 
@@ -23,7 +23,7 @@ cp template.env .env && $EDITOR .env    # domain, index path, version, heap
 docker compose pull
 bin/index/update.sh                     # fetches the index, see "The index" below
 docker compose up -d
-docker compose logs -f photon           # opening a ~100 GB index takes a minute or more
+docker compose logs -f photon           # opening a ~92 GB index takes a minute or more
 bin/cert/setup_renewal.sh               # weekly renewal from cron
 
 curl "https://$DOMAIN_NAME/api?q=berlin&limit=1"
@@ -83,7 +83,7 @@ config names `/var/www` as webroot, which is where the certbot container sees
 `--check` only reports whether the dump differs from the installed one.
 
 It replaces the index **in place**: the disk has no room for a second index
-next to the first (about 90 GB index, 50 GB free). So it stops Photon, deletes
+next to the first (a 92 GB index, 50 GB free). So it stops Photon, deletes
 the old index and streams the dump straight into place, with no archive on
 disk. The first run, in November 2026, kept Photon down for 49 minutes, nearly
 all of it the download (63 GB at about 21 MB/s; lbzip2 keeps up with that).
@@ -136,7 +136,7 @@ tests/smoke.sh photon-test
 **There is no way back by default.** Each Photon release embeds an OpenSearch
 version, and OpenSearch records it in the index on start: after 1.3.0
 (OpenSearch 3.8) has opened an index, 1.2.1 (3.7) refuses it with `cannot
-downgrade a node`. The Lucene segments, nearly all of the ~100 GB, stay
+downgrade a node`. The Lucene segments, nearly all of the 92 GB, stay
 untouched; only the metadata (`_state`, `translog`, logs, a few MB) changes. So
 before an upgrade, with Photon stopped, keep that metadata:
 
@@ -176,7 +176,7 @@ tar -C /var/lib/photon -xf /root/photon-state.tar
 
 ## The one thing that determines performance
 
-The index is ~100 GB against 15 GB of RAM, so ~11 % of it is cacheable and
+The index is 92 GB against 15 GB of RAM, so ~11 % of it is cacheable and
 every query that misses the page cache pays a disk seek. Everything else is
 downstream of that:
 

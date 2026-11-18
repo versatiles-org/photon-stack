@@ -4,7 +4,7 @@ set -euo pipefail
 # Replaces the Photon index with the latest dump (PHOTON_DUMP_URL), in place.
 #
 # The disk has no room for a second index next to the first (on
-# geocode.versatiles.org: a ~90 GB index and ~50 GB free), so this stops
+# geocode.versatiles.org: a 92 GB index and ~50 GB free), so this stops
 # Photon, deletes the old index and streams the dump straight into place:
 # download, decompress and unpack in one pipe, with no archive on disk. Photon
 # is down meanwhile; nginx keeps answering the searches it has cached. If the
@@ -92,7 +92,7 @@ fi
 # --- Does it fit? -----------------------------------------------------------
 
 # Unpacked, a dump takes about 1.45 times its compressed size (planet in
-# November 2026: 63 GB, ~90 GB unpacked; Andorra: 1.6 times). Require 1.6
+# November 2026: 63 GB, 92 GB unpacked; Andorra: 1.6 times). Require 1.6
 # times, plus 5 GB for the rest of the disk (nginx cache, logs). The old index
 # and any leftovers of an earlier run count as free: they are deleted first.
 AVAIL=$(df --output=avail -B1 "$DATA" | tail -1)
