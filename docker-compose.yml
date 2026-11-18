@@ -1,14 +1,12 @@
 services:
   photon:
-    build:
-      context: .
-      args:
-        PHOTON_VERSION: "${PHOTON_VERSION}"
-        PHOTON_UID: "${PHOTON_UID}"
-        PHOTON_GID: "${PHOTON_GID}"
-    image: "photon-local:${PHOTON_VERSION}"
+    # Built and published by .github/workflows/image.yml. To try a local build
+    # instead: `docker build -t ghcr.io/versatiles-org/photon:<version> .`
+    image: "ghcr.io/versatiles-org/photon:${PHOTON_VERSION}"
     container_name: photon
     restart: unless-stopped
+    # Must match the owner of the bind-mounted index directory on the host.
+    user: "${PHOTON_UID}:${PHOTON_GID}"
 
     # ---------------------------------------------------------------------
     # DO NOT ADD `mem_limit` / `deploy.resources.limits.memory` HERE.
@@ -21,25 +19,20 @@ services:
     # ---------------------------------------------------------------------
 
     environment:
-      JAVA_OPTS: >-
-        -Xms${JAVA_HEAP_MIN}
-        -Xmx${JAVA_HEAP_MAX}
-        -XX:+UseG1GC
-        -XX:+ExitOnOutOfMemoryError
-        -Djava.io.tmpdir=/photon/tmp
-        -Dfile.encoding=UTF-8
-      # -listen-ip 0.0.0.0 is safe: the published port below is bound to
-      # 127.0.0.1 on the host, so nothing is reachable from outside.
-      # -query-timeout caps pathological queries (`q=b` cost 6.3s on 0.6.2).
-      PHOTON_ARGS: >-
-        -data-dir /photon/data
-        -listen-ip 0.0.0.0
-        -listen-port 2322
-        -cors-any
-        -query-timeout 5
-        -max-results 20
-        -default-language en
+      # Added to the image's JAVA_OPTS by the JVM itself.
+      JAVA_TOOL_OPTIONS: "-Xms${JAVA_HEAP_MIN} -Xmx${JAVA_HEAP_MAX}"
       PHOTON_DATA_DIR: "${PHOTON_DATA_DIR}"
+
+    # Appended to the image's PHOTON_ARGS (data dir, listen address and port).
+    # -query-timeout caps pathological queries (`q=b` cost 6.3s on 0.6.2).
+    command:
+      - -cors-any
+      - -query-timeout
+      - "5"
+      - -max-results
+      - "20"
+      - -default-language
+      - en
 
     volumes:
       # Bind-mount, NOT a named volume: keeps the index on the raw local
@@ -47,16 +40,12 @@ services:
       - "${PHOTON_DATA_DIR}:/photon/data"
       - photon-tmp:/photon/tmp
 
+    # The image listens on 0.0.0.0 inside the container; this binds it to
+    # loopback on the host, so nothing is reachable from outside.
     ports:
       - "127.0.0.1:${PHOTON_HOST_PORT}:2322"
 
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS 'http://localhost:2322/api?q=berlin&limit=1' >/dev/null || exit 1"]
-      interval: 30s
-      timeout: 15s
-      retries: 3
-      # Cold-starting OpenSearch over a ~100 GB index takes minutes.
-      start_period: 300s
+    # The healthcheck is the image's (Dockerfile: HEALTHCHECK on /status).
 
     # The old setup produced a 392 MB unrotated photon.log. json-file would
     # reproduce that faithfully without these caps.
