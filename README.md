@@ -113,7 +113,7 @@ tests/smoke.sh photon-test
 |------------------------------|---------------------------------------------------------------------------------------|
 | `template.env`               | domain, version, index path, port, heap — copy to `.env`, start there                 |
 | `docker-compose.yml`         | Photon, nginx, certbot; read the `mem_limit` comment before editing                   |
-| `Dockerfile`                 | `eclipse-temurin:21-jre` + the Photon jar (1.x embeds OpenSearch 3.x, needs Java 21+) |
+| `Dockerfile`                 | `eclipse-temurin:25-jre` + the Photon jar (1.x embeds OpenSearch 3.x, needs Java 21+) |
 | `entrypoint.sh`              | fails fast and loudly if the index bind-mount is missing                              |
 | `nginx/`                     | TLS, response cache, rate limit, `robots.txt`                                         |
 | `bin/cert/`                  | certificate renewal and its cron job                                                  |
