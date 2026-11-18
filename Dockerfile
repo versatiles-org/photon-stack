@@ -30,7 +30,7 @@ WORKDIR /photon
 ADD --checksum=sha256:${PHOTON_SHA256} --chmod=644 \
     "https://github.com/komoot/photon/releases/download/${PHOTON_VERSION}/photon-${PHOTON_VERSION}.jar" \
     /photon/photon.jar
-COPY --chmod=755 entrypoint.sh /photon/entrypoint.sh
+COPY --chmod=755 entrypoint.sh healthcheck.sh /photon/
 
 # /photon/data is where the index is mounted. /photon/tmp is world-writable
 # (with the sticky bit, like /tmp), so the container works under any uid: the
@@ -50,10 +50,10 @@ ENV JAVA_OPTS="-XX:+UseG1GC -XX:+ExitOnOutOfMemoryError -Djava.io.tmpdir=/photon
 USER 1000:1000
 EXPOSE 2322
 
-# /status answers once the index is open, and reads nothing but its metadata.
-# Opening a planet index takes about a minute after a reboot, longer with a
-# cold disk; --start-interval checks every 5 s during that time.
+# healthcheck.sh asks /status, without curl (see there). Opening a planet index
+# takes about a minute after a reboot, longer with a cold disk; --start-interval
+# checks every 5 s during that time.
 HEALTHCHECK --start-period=300s --start-interval=5s --interval=30s --timeout=15s --retries=3 \
-    CMD curl -fsS http://localhost:2322/status >/dev/null || exit 1
+    CMD ["/photon/healthcheck.sh"]
 
 ENTRYPOINT ["/photon/entrypoint.sh"]
