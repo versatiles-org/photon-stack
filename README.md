@@ -85,8 +85,10 @@ config names `/var/www` as webroot, which is where the certbot container sees
 It replaces the index **in place**: the disk has no room for a second index
 next to the first (about 90 GB index, 50 GB free). So it stops Photon, deletes
 the old index and streams the dump straight into place, with no archive on
-disk. Meanwhile nginx answers only the searches in its cache, which in
-November 2026 was 99.6 % of requests; new searches get a `502`. Before
+disk. The first run, in November 2026, kept Photon down for 49 minutes, nearly
+all of it the download (63 GB at about 21 MB/s; lbzip2 keeps up with that).
+Meanwhile nginx answers only the searches in its cache, which in November 2026
+was 99.6 % of requests; new searches get a `502`. Before
 stopping anything it checks that the dump is reachable, that it is not the one
 already installed (its MD5, kept in `$PHOTON_DATA_DIR/dump.md5`), and that it
 fits. A failed download is tried three times; after that Photon stays stopped
