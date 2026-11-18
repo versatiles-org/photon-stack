@@ -11,8 +11,8 @@ FROM eclipse-temurin:25-jre-noble@sha256:e3b6f7887a50f20d8f07abf279d8a81a5953fb3
 #   gh api repos/komoot/photon/releases/tags/<version> --jq '.assets[].digest'
 # .github/workflows/photon-release.yml opens an issue with both values when a
 # new release appears.
-ARG PHOTON_VERSION=1.2.1
-ARG PHOTON_SHA256=6ea66d598a3f6fc1b59b0f81ad4f8abee72ccdb9d3db03bc12008974cdebd58d
+ARG PHOTON_VERSION=1.3.0
+ARG PHOTON_SHA256=a89707c0045e4807b2a1180e132e68e108d998709f48b6c94b98a6e281f571a5
 
 LABEL org.opencontainers.image.title="photon" \
       org.opencontainers.image.description="Photon geocoder (komoot/photon) as run on geocode.versatiles.org" \

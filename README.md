@@ -89,7 +89,7 @@ The image runs on its own; compose only adds what is specific to this server:
 
 ```bash
 docker run -d -p 2322:2322 -v /path/to/index:/photon/data \
-    ghcr.io/versatiles-org/photon:1.2.1 -cors-any
+    ghcr.io/versatiles-org/photon:1.3.0 -cors-any
 ```
 
 Arguments after the image name are passed to `photon serve`, after the image's
@@ -105,6 +105,31 @@ Dependabot. Test a change locally with:
 ```bash
 docker build -t photon-test .
 tests/smoke.sh photon-test
+```
+
+**There is no way back by default.** Each Photon release embeds an OpenSearch
+version, and OpenSearch records it in the index on start: after 1.3.0
+(OpenSearch 3.8) has opened an index, 1.2.1 (3.7) refuses it with `cannot
+downgrade a node`. The Lucene segments, nearly all of the ~100 GB, stay
+untouched; only the metadata (`_state`, `translog`, logs, a few MB) changes. So
+before an upgrade, with Photon stopped, keep that metadata:
+
+```bash
+docker compose stop photon
+tar -C /var/lib/photon -cf /root/photon-state.tar \
+    --exclude='photon_data/node_1/data/nodes/0/indices/*/*/index' photon_data
+```
+
+To go back, with Photon stopped: move everything written since the backup into
+a second archive (GNU tar's `--remove-files`), unpack the backup, and set the
+old `PHOTON_VERSION` in `.env`:
+
+```bash
+cd /var/lib/photon && find photon_data \
+    -path 'photon_data/node_1/data/nodes/0/indices/*/*/index' -prune -o \
+    -type f -newer /root/photon-state.tar -print0 \
+  | tar --null -T - --remove-files -cf /root/photon-state-new.tar
+tar -C /var/lib/photon -xf /root/photon-state.tar
 ```
 
 ## Layout
