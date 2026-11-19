@@ -126,7 +126,17 @@ index belongs to someone else.
 **Upgrading Photon:** `.github/workflows/photon-release.yml` checks weekly for a
 new release and opens an issue with the new `PHOTON_VERSION` and `PHOTON_SHA256`
 for the `Dockerfile`. The base image, nginx and certbot are kept current by
-Dependabot. Test a change locally with:
+Dependabot.
+
+**Security scan:** `.github/workflows/scan-images.yml` scans the images in
+`docker-compose.yml` (Photon, nginx, certbot) for known vulnerabilities every
+Monday. A run fails, and GitHub sends a failure email, when one has a CRITICAL
+or HIGH vulnerability with a fix available; the findings are under Security →
+Code scanning. The same workflow runs in tiles.versatiles.org. Trivy can't
+check nginx itself in the official nginx image, only the other packages in it
+(the workflow explains why).
+
+Test a change locally with:
 
 ```bash
 docker build -t photon-test .
@@ -170,7 +180,7 @@ tar -C /var/lib/photon -xf /root/photon-state.tar
 | `bin/cert/`                  | certificate renewal and its cron job                                                  |
 | `bin/index/`                 | index update, in place, and its opt-in cron job                                       |
 | `tests/`                     | `smoke.sh` (image against a small real index), `nginx-config.sh` (`nginx -t`)          |
-| `.github/`                   | CI, image publishing, Dependabot, weekly check for new Photon releases                |
+| `.github/`                   | CI, image publishing, Dependabot, weekly Photon release check and vulnerability scan  |
 | `volumes/`                   | certificates and ACME challenges, written on the server, not committed                |
 | `bench.sh`                   | cold/warm latency measurement                                                         |
 
