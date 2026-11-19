@@ -25,6 +25,7 @@ bin/index/update.sh                     # fetches the index, see "The index" bel
 docker compose up -d
 docker compose logs -f photon           # opening a ~92 GB index takes a minute or more
 bin/cert/setup_renewal.sh               # weekly renewal from cron
+bin/nginx/setup_auto_update.sh          # daily nginx image update from cron
 
 curl "https://$DOMAIN_NAME/api?q=berlin&limit=1"
 ```
@@ -52,6 +53,16 @@ with `DOMAIN_NAME` from `.env`). What it does:
 After a change: `nginx.conf` needs `docker compose exec nginx nginx -s reload`;
 the template is rendered at start, so it needs `docker compose restart nginx`
 (about two seconds without nginx). Check either first with `tests/nginx-config.sh`.
+
+**New nginx images** go live by themselves: `bin/nginx/update.sh` runs daily
+from cron (`bin/nginx/setup_auto_update.sh`), so a security fix in nginx is
+live within a day of its release. It pulls the nginx image and does nothing
+unless a newer one arrived. Then it checks the config with
+`tests/nginx-config.sh`, recreates nginx (about 3 seconds without it) and checks
+that it is healthy and answers HTTPS. If the config does not load, nginx keeps
+the previous image; if the new one does not work, nginx is recreated from the
+previous one. Photon is not touched. The log is `/var/log/nginx-update.log`; the
+script exits 1 whenever something needs a look.
 
 Logs, and latency from them:
 
@@ -179,6 +190,7 @@ tar -C /var/lib/photon -xf /root/photon-state.tar
 | `nginx/`                     | TLS, response cache, rate limit, `robots.txt`                                         |
 | `bin/cert/`                  | certificate renewal and its cron job                                                  |
 | `bin/index/`                 | index update, in place, and its opt-in cron job                                       |
+| `bin/nginx/`                 | daily nginx image update and its cron job                                             |
 | `tests/`                     | `smoke.sh` (image against a small real index), `nginx-config.sh` (`nginx -t`)          |
 | `.github/`                   | CI, image publishing, Dependabot, weekly Photon release check and vulnerability scan  |
 | `volumes/`                   | certificates and ACME challenges, written on the server, not committed                |
