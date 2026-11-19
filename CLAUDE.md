@@ -12,6 +12,12 @@ in mind when changing it.
   fine, and so is an hour without new searches during an index update (nginx
   answers cached ones). Don't add redundancy, a second disk or a bigger server
   to avoid either.
+- Unattended upgrades install Debian security updates daily (around 06:45
+  UTC) and reboot at 05:30 when one needs it, i.e. a new kernel. That is set
+  on the server in `/etc/apt/apt.conf.d/52unattended-upgrades-local`, not in
+  the repo. The cron jobs keep clear of it: index update on the 1st at 02:00
+  (opt-in), certificate renewal on Sundays at 03:00, nginx update daily at
+  04:30. Docker itself is updated by hand.
 - There is no access from here. The user runs commands on the server and pastes
   the output: give small blocks with one purpose each, say what to expect, and
   keep explanations out of code blocks (pasted prose once left the shell in a
