@@ -8,6 +8,10 @@ and rate-limits clients; certbot renews the certificate. Planet index, all
 languages. There is no official Photon image, so this repo builds a thin one,
 pins the version, and publishes it as `ghcr.io/versatiles-org/photon`.
 
+This README is about running the server. How to use it (endpoints, parameters,
+rate limit, attribution) is in the guide at
+<https://docs.versatiles.org/guides/use_geocode_versatiles_org>.
+
 ```
 client ──► nginx :443 ──────────────► photon :2322 ──► ~92 GB index on local NVMe
            cache 4g/7d, 5 req/s/IP                     mmapped, served from page cache
