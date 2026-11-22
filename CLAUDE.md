@@ -17,7 +17,7 @@ in mind when changing it.
   on the server in `/etc/apt/apt.conf.d/52unattended-upgrades-local`, not in
   the repo. The cron jobs keep clear of it: index update on the 1st at 02:00
   (opt-in), certificate renewal on Sundays at 03:00, nginx update daily at
-  04:30. Docker itself is updated by hand.
+  04:30, log rotation nightly at 00:10. Docker itself is updated by hand.
 - There is no access from here. The user runs commands on the server and pastes
   the output: give small blocks with one purpose each, say what to expect, and
   keep explanations out of code blocks (pasted prose once left the shell in a
@@ -35,7 +35,10 @@ in mind when changing it.
   and an older one refuses an index a newer one has opened. If it changes, back
   up the metadata first (README, "Upgrading Photon").
 - **Privacy in the logs.** The access log has no query string (the search text)
-  and anonymised addresses; the error log only `crit`. Keep it that way.
+  and anonymised addresses; the error log only `crit`. Request and error logs
+  are deleted after 28 days (`bin/log/rotate.sh`), and the usage statistics
+  hold nothing about the client, as the planned terms of use say. Keep it that
+  way, and keep `bin/log/rotate.sh` alike in tiles.versatiles.org.
 - **The healthcheck uses bash's `/dev/tcp`**, not curl or wget: `eclipse-temurin`
   images don't promise either.
 - **The real client address** reaches nginx over IPv6 only because the compose

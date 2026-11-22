@@ -92,6 +92,10 @@ services:
       - ./volumes/letsencrypt/:/etc/letsencrypt/:ro
       - ./volumes/certbot-www/:/var/www/certbot/:ro
       - nginx-cache:/var/cache/nginx/
+      # The request and error logs and the usage statistics, rotated by
+      # bin/log/rotate.sh. Hides the image's access.log/error.log symlinks to
+      # the container output, which nothing here uses.
+      - ./volumes/nginx-log/:/var/log/nginx/
     environment:
       DOMAIN_NAME: "${DOMAIN_NAME}"
     security_opt:

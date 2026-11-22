@@ -12,14 +12,52 @@ proxy_cache_path /var/cache/nginx/photon
                  inactive=7d
                  use_temp_path=off;
 
-# One line per request, to the container log (`docker compose logs nginx`;
-# Docker rotates it, see `logging` in docker-compose.yml). No query string: for
-# a geocoder that is the search text, often someone's address. The client
-# address is anonymised (map in nginx.conf).
-log_format photon_fmt '$remote_addr_anon [$time_iso8601] "$request_method $uri" '
-                      '$status $body_bytes_sent '
-                      'rt=$request_time urt=$upstream_response_time '
-                      'cache=$upstream_cache_status';
+# Two logs, as on tiles.versatiles.org, in volumes/nginx-log. Both are
+# compressed while they are written and reach the file with up to a minute's
+# delay. bin/log/rotate.sh moves them into archives every night.
+#
+#   access.tsv.gz         every request, to find errors, misuse and attacks.
+#                         Archives are deleted after 28 days.
+#   referer_stats.tsv.gz  every answered request, without anything about the
+#                         client, for usage statistics per website. Kept.
+#
+# Neither has the query string: for a geocoder that is the search text, often
+# someone's address.
+
+# The referer reduced to scheme://host[:port]. The path and query string of the
+# referring page are nobody's business here and may contain personal data or
+# tokens; the statistics only use the host. Anything that is not a URL is
+# dropped. No referer is logged as "-", as nginx does for an unset variable.
+map $http_referer $referer_origin {
+   default "-";
+   "~^(?<ref_scheme>[a-zA-Z][a-zA-Z0-9+.-]*)://(?:[^/?#@]*@)?(?<ref_host>[^/?#]+)" "$ref_scheme://$ref_host";
+}
+
+# The time of a request, cut down to the hour (YYYY-MM-DDTHH, UTC), for the
+# statistics, which are kept without limit: a finer time could link a request
+# from a small site to one visitor.
+map $time_iso8601 $time_hour {
+   default "-";
+   "~^(?<log_hour>\d{4}-\d{2}-\d{2}T\d{2})" "$log_hour";
+}
+
+# What counts as answered: 2xx and 304.
+map $status $successful {
+   ~^[2]   1;
+   304     1;
+   default 0;
+}
+
+# Columns: time, anonymised client address (map in nginx.conf), method, path,
+# status, bytes, request time, upstream time ("-" when nginx answered itself
+# or from the cache), cache status, referer origin, user agent.
+log_format access_tsv '$time_iso8601\t$remote_addr_anon\t$request_method\t$uri\t'
+                      '$status\t$body_bytes_sent\t$request_time\t$upstream_response_time\t'
+                      '$upstream_cache_status\t$referer_origin\t$http_user_agent';
+
+# Columns: referer origin, path, bytes, status, hour. The first five columns of
+# tiles.versatiles.org's referer_stats, so the same tools read both.
+log_format referer_tsv '$referer_origin\t$uri\t$body_bytes_sent\t$status\t$time_hour';
 
 # Rate-limited requests (429) tell the client when to come back. Empty for
 # every other status: nginx sends no header for an empty value.
@@ -84,7 +122,8 @@ server {
    ssl_session_tickets off;
    # No OCSP stapling: Let's Encrypt no longer runs an OCSP responder.
 
-   access_log /dev/stdout photon_fmt;
+   access_log /var/log/nginx/access.tsv.gz access_tsv gzip flush=1m;
+   access_log /var/log/nginx/referer_stats.tsv.gz referer_tsv gzip flush=1m if=$successful;
    charset utf-8;
 
    # `always`, so error responses (429, 502) carry them too. Keep every

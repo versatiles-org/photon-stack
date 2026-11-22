@@ -30,6 +30,7 @@ docker compose up -d
 docker compose logs -f photon           # opening a ~92 GB index takes a minute or more
 bin/cert/setup_renewal.sh               # weekly renewal from cron
 bin/nginx/setup_auto_update.sh          # daily nginx image update from cron
+bin/log/setup_rotation.sh               # nightly log rotation from cron
 
 curl "https://$DOMAIN_NAME/api?q=berlin&limit=1"
 ```
@@ -49,9 +50,7 @@ with `DOMAIN_NAME` from `.env`). What it does:
   every other path may be answered from the cache even while Photon is down.
 - **Not for search engines**: `X-Robots-Tag: noindex` on every response, and a
   `robots.txt` that keeps crawlers out of `/api` and `/reverse`.
-- **Logs without personal data**: the access log has an anonymised client
-  address and no query string (the search text); the error log only critical
-  errors. Both go to the container log, which Docker rotates.
+- **Logs**, in `volumes/nginx-log/`, see "Logs" below.
 - Port 80 redirects to HTTPS, except certbot's challenges.
 
 After a change: `nginx.conf` needs `docker compose exec nginx nginx -s reload`;
@@ -68,11 +67,40 @@ the previous image; if the new one does not work, nginx is recreated from the
 previous one. Photon is not touched. The log is `/var/log/nginx-update.log`; the
 script exits 1 whenever something needs a look.
 
-Logs, and latency from them:
+## Logs
+
+nginx writes three files to `volumes/nginx-log/`, as on tiles.versatiles.org.
+None of them has the query string, which for a geocoder is the search text.
+
+| File                   | Contains                                                                         | Kept    |
+|------------------------|----------------------------------------------------------------------------------|---------|
+| `access.tsv.gz`        | Every request: time, anonymised client address, path, status, size, request and upstream time, cache status, referer origin, user agent | 28 days |
+| `referer_stats.tsv.gz` | Every answered request (2xx, 304): referer origin, path, size, status, hour      | always  |
+| `error.log`            | nginx's own errors, critical only                                                | 28 days |
+
+- **Client address:** anonymised, the last octet of an IPv4 address zeroed, an
+  IPv6 address cut to its first two groups (32 of 128 bits).
+- **Referer:** only `scheme://host`, never the path or query string of the
+  referring page.
+- **Exception:** nginx writes `error.log` in a fixed format that includes the
+  full client address and request line. `bin/log/rotate.sh` anonymises both
+  and removes the query string every night, so they exist only in the live
+  file, for a day at most.
+
+`bin/log/rotate.sh` runs every night from cron (`bin/log/setup_rotation.sh`):
+it moves the request and error logs into one archive per day
+(`<name>.<YYYY-MM-DD>.…`) and deletes those older than 28 days, and on the 1st
+the usage statistics into one archive per month (`referer_stats.<YYYY-MM>.tsv.gz`),
+which are kept. The log is `/var/log/nginx-log-rotation.log`.
+
+The access logs are compressed while they are written and reach the file with
+up to a minute's delay. The last requests, the slowest, and the websites that
+send the most:
 
 ```bash
-docker compose logs --no-log-prefix nginx | tail
-docker compose logs --no-log-prefix nginx | grep -o 'rt=[0-9.]*' | cut -d= -f2 | sort -n | tail -20
+gzip -dc volumes/nginx-log/access.tsv.gz 2>/dev/null | tail
+gzip -dc volumes/nginx-log/access.tsv.gz 2>/dev/null | cut -f7 | sort -n | tail -20
+gzip -dc volumes/nginx-log/referer_stats*.tsv.gz 2>/dev/null | cut -f1 | sort | uniq -c | sort -rn | head
 ```
 
 ## Certificates
@@ -195,9 +223,10 @@ tar -C /var/lib/photon -xf /root/photon-state.tar
 | `bin/cert/`                  | certificate renewal and its cron job                                                  |
 | `bin/index/`                 | index update, in place, and its opt-in cron job                                       |
 | `bin/nginx/`                 | daily nginx image update and its cron job                                             |
+| `bin/log/`                   | nightly log rotation and deletion after 28 days, and its cron job                     |
 | `tests/`                     | `smoke.sh` (image against a small real index), `nginx-config.sh` (`nginx -t`)          |
 | `.github/`                   | CI, image publishing, Dependabot, weekly Photon release check and vulnerability scan  |
-| `volumes/`                   | certificates and ACME challenges, written on the server, not committed                |
+| `volumes/`                   | certificates, ACME challenges and nginx logs, written on the server, not committed    |
 | `bench.sh`                   | cold/warm latency measurement                                                         |
 
 ## The one thing that determines performance
