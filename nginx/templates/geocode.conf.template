@@ -139,6 +139,9 @@ server {
    # HIT / MISS / STALE / UPDATING; none for what nginx answers itself.
    add_header X-Cache-Status $upstream_cache_status always;
    add_header Retry-After $retry_after always;
+   # Points developers who inspect a response to the terms of use (RFC 8288,
+   # registered relation "terms-of-service"). /terms below redirects there too.
+   add_header Link '<https://versatiles.org/terms/>; rel="terms-of-service"' always;
 
    # For every location that proxies to Photon.
    proxy_http_version    1.1;
@@ -153,6 +156,11 @@ server {
 
    location = / {
       return 204;
+   }
+
+   # The terms of use live on versatiles.org.
+   location = /terms {
+      return 301 https://versatiles.org/terms/;
    }
 
    # Search engines may fetch `/` (and see its noindex, which is what removes it
