@@ -53,9 +53,14 @@ with `DOMAIN_NAME` from `.env`). What it does:
 - **Logs**, in `volumes/nginx-log/`, see "Logs" below.
 - Port 80 redirects to HTTPS, except certbot's challenges.
 
-After a change: `nginx.conf` needs `docker compose exec nginx nginx -s reload`;
-the template is rendered at start, so it needs `docker compose restart nginx`
-(about two seconds without nginx). Check either first with `tests/nginx-config.sh`.
+After a change is pushed, `bin/update.sh` on the server deploys it: it pulls,
+checks the config with `tests/nginx-config.sh`, renders the template again and
+reloads nginx without a gap. If the config doesn't load, it applies nothing and
+puts the checkout back to the commit before the pull. It recreates nginx only
+when the container no longer matches `docker-compose.yml` (about three seconds
+without nginx), checks that nginx answers HTTPS and Photon `/status`, and never
+touches Photon: when Photon needs a new image or version, it says what to run.
+`bin/update.sh --dry-run` lists what a pull would bring.
 
 **New nginx images** go live by themselves: `bin/nginx/update.sh` runs daily
 from cron (`bin/nginx/setup_auto_update.sh`), so a security fix in nginx is
@@ -220,6 +225,7 @@ tar -C /var/lib/photon -xf /root/photon-state.tar
 | `Dockerfile`                 | `eclipse-temurin:25-jre` + the Photon jar (1.x embeds OpenSearch 3.x, needs Java 21+) |
 | `entrypoint.sh`              | fails fast and loudly if the index bind-mount is missing                              |
 | `nginx/`                     | TLS, response cache, rate limit, `robots.txt`                                         |
+| `bin/update.sh`              | deploys a push: pull, check and reload nginx; never touches Photon                    |
 | `bin/cert/`                  | certificate renewal and its cron job                                                  |
 | `bin/index/`                 | index update, in place, and its opt-in cron job                                       |
 | `bin/nginx/`                 | daily nginx image update and its cron job                                             |

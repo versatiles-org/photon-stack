@@ -57,5 +57,16 @@ in mind when changing it.
 ## Deploying
 
 A push to `main` publishes the image (`.github/workflows/image.yml`). On the
-server: `git pull`; for a new Photon version, set `PHOTON_VERSION` in `.env`
-before `docker compose pull photon`, then `docker compose up -d --wait photon`.
+server: `bin/update.sh` pulls and applies nginx changes, never Photon. For a new
+Photon version, set `PHOTON_VERSION` in `.env` before `docker compose pull
+photon`, then `docker compose up -d --wait photon`.
+
+Testing `bin/update.sh` without the server: a scratch "origin" clone with the
+change committed, a "server" clone of it with an `.env`, a self-signed
+certificate with a SAN under `volumes/letsencrypt/live/<domain>/`, and nginx
+started alone (`docker compose up -d --no-deps nginx`). Run the script in a
+Linux container (macOS has no `flock`) with the Docker socket, the scratch
+folder at the same path, `TMPDIR` inside it (for `tests/nginx-config.sh`),
+`CURL_CA_BUNDLE` set to the certificate, and 127.0.0.1:443 forwarded to the
+host. Start nginx from that container's compose too: compose versions can
+compute different config hashes, which makes the script recreate nginx.

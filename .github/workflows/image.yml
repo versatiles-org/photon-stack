@@ -30,7 +30,7 @@ jobs:
 
       # shellcheck is preinstalled on GitHub's Ubuntu runners.
       - name: shellcheck
-        run: shellcheck entrypoint.sh healthcheck.sh bench.sh tests/*.sh bin/*/*.sh
+        run: shellcheck entrypoint.sh healthcheck.sh bench.sh tests/*.sh bin/*.sh bin/*/*.sh
 
   test:
     name: Test (${{ matrix.arch }})
