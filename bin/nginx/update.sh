@@ -16,6 +16,9 @@ set -euo pipefail
 #   - The switch costs about 3 seconds of refused connections.
 #   - Afterwards nginx must be healthy and answer HTTPS with the real
 #     certificate. If not, it is recreated from the previous image.
+#   - Afterwards the running nginx must be the newest release of a line that
+#     nginx.org still maintains (bin/nginx/check_version.sh). That catches the
+#     tag in docker-compose.yml going stale, which the rollout alone can't see.
 # Photon is never touched (--no-deps), and the response cache survives the
 # switch (a named volume).
 #
@@ -27,6 +30,13 @@ cd "$(dirname "$0")/../.."
 . ./.env
 
 log() { echo "$(date -u +%FT%TZ) $*"; }
+
+# Fails when the nginx that runs is behind nginx.org, see check_version.sh.
+check_version() {
+    local running
+    running=$(docker compose exec -T nginx nginx -v 2>&1 | sed -n 's#^nginx version: nginx/##p' || true)
+    ./bin/nginx/check_version.sh "$running"
+}
 
 # One run at a time (cron and a manual run). The kernel releases the lock when
 # the script exits, however it exits.
@@ -61,6 +71,7 @@ new_image=$(docker image inspect -f '{{.Id}}' "$image_ref")
 
 if [ "$new_image" = "$old_image" ]; then
     log "nginx is up to date ($image_ref)."
+    check_version || exit 1
     exit 0
 fi
 log "A new $image_ref arrived: ${old_image:7:12} → ${new_image:7:12}."
@@ -107,3 +118,4 @@ if ! recreate_nginx || ! nginx_works; then
 fi
 
 log "nginx update completed: nginx runs the new image and answers HTTPS."
+check_version || exit 1

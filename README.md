@@ -72,6 +72,19 @@ the previous image; if the new one does not work, nginx is recreated from the
 previous one. Photon is not touched. The log is `/var/log/nginx-update.log`; the
 script exits 1 whenever something needs a look.
 
+The rollout only picks up new images under the tag `docker-compose.yml` names
+(`nginx:1.31-…`). Once nginx.org stops releasing fixes for 1.31, that tag gets
+no new images, and the rollout alone would say "up to date" every day. So after
+each run, `bin/nginx/check_version.sh` compares the running nginx with nginx's
+releases (GitHub's list for nginx/nginx) and exits 1 when a newer release of the
+same line has been out for more than 2 days, or when the line is no longer one
+of the two nginx.org maintains (mainline and stable). Then move the tag in
+`docker-compose.yml` to a maintained line. If the release list can't be read,
+that is only a warning. The running and the newest version go into the job's
+report for the private dashboard (see "Cron job reports" below). The same
+script as in tiles.versatiles.org; `bin/nginx/check_version.sh 1.31.10` checks a
+version by hand.
+
 ## Logs
 
 nginx writes three files to `volumes/nginx-log/`, as on tiles.versatiles.org.

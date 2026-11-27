@@ -49,8 +49,9 @@ in mind when changing it.
 - `shellcheck` on the files `.github/workflows/image.yml` lists.
 - `tests/smoke.sh <image>` after a `docker build`, `tests/nginx-config.sh` after
   any change under `nginx/`.
-- `tests/cron-run.sh` after a change to `bin/cron/run.sh`, which must stay alike
-  with the one in tiles.versatiles.org.
+- `tests/cron-run.sh` after a change to `bin/cron/run.sh`, and
+  `tests/nginx-version.sh` after one to `bin/nginx/check_version.sh`. Both
+  scripts must stay alike with the ones in tiles.versatiles.org.
 - To test `bin/index/update.sh` without the server: a copy of the repo with its
   own `.env` (`PHOTON_DUMP_URL` set to the Andorra dump, a scratch
   `PHOTON_DATA_DIR`), run from a Debian container with the Docker CLI, `lbzip2`

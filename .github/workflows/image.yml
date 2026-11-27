@@ -36,6 +36,10 @@ jobs:
       - name: Cron job report test
         run: tests/cron-run.sh
 
+      # bin/nginx/check_version.sh tells whether nginx is behind nginx.org.
+      - name: nginx version check test
+        run: tests/nginx-version.sh
+
   test:
     name: Test (${{ matrix.arch }})
     strategy:
