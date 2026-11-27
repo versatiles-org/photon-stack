@@ -67,7 +67,10 @@ services:
         hard: 65536
 
   nginx:
-    image: nginx:1.31-alpine
+    # The slim variant: the same nginx, without the optional modules (njs,
+    # xslt, image-filter, geoip, acme) and the libraries they pull in, such as
+    # libxml2. The config loads none of them.
+    image: nginx:1.31-alpine-slim
     container_name: nginx
     restart: unless-stopped
     # nginx.conf's worker_shutdown_timeout (1s) makes it exit within about 2s;
