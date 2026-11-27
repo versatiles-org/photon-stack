@@ -124,6 +124,23 @@ first start: `cp -a /etc/letsencrypt/. volumes/letsencrypt/`. Its renewal
 config names `/var/www` as webroot, which is where the certbot container sees
 `volumes/certbot-www/`.
 
+## Cron job reports
+
+The cron jobs (certificate renewal, log rotation, nginx updates and, if turned
+on, index updates) run through `bin/cron/run.sh`, which reports each run to the
+private dashboard on status.versatiles.org: the exit code, the last line of
+output, and when the next run is due, so a job that stops running shows too.
+The job's output still goes to its log file, and a report that fails never
+fails the job. These reports stay private, because some of them concern
+security. The same script as in tiles.versatiles.org.
+
+To turn them on, copy `REPORT_TOKEN_GEOCODE` from status.versatiles.org's
+`.env` into this server's `.env` as `REPORT_TOKEN`. To check it by hand:
+
+```bash
+bin/cron/run.sh nginx-update 86400 bin/nginx/update.sh   # runs the job and reports it, as cron does
+```
+
 ## The index
 
 `bin/index/update.sh` installs the dump that `PHOTON_DUMP_URL` names
@@ -230,7 +247,8 @@ tar -C /var/lib/photon -xf /root/photon-state.tar
 | `bin/index/`                 | index update, in place, and its opt-in cron job                                       |
 | `bin/nginx/`                 | daily nginx image update and its cron job                                             |
 | `bin/log/`                   | nightly log rotation and deletion after 28 days, and its cron job                     |
-| `tests/`                     | `smoke.sh` (image against a small real index), `nginx-config.sh` (`nginx -t`)          |
+| `bin/cron/`                  | `run.sh`, which runs each cron job and reports it to the private dashboard            |
+| `tests/`                     | `smoke.sh` (image against a small real index), `nginx-config.sh` (`nginx -t`), `cron-run.sh` |
 | `.github/`                   | CI, image publishing, Dependabot, weekly Photon release check and vulnerability scan  |
 | `volumes/`                   | certificates, ACME challenges and nginx logs, written on the server, not committed    |
 | `bench.sh`                   | cold/warm latency measurement                                                         |

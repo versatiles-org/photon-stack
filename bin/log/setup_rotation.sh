@@ -8,7 +8,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 PROJECT_DIR="$(pwd)"
-CRON_CMD="10 0 * * * cd '${PROJECT_DIR}' && ./bin/log/rotate.sh >> /var/log/nginx-log-rotation.log 2>&1"
+CRON_CMD="10 0 * * * cd '${PROJECT_DIR}' && ./bin/cron/run.sh log-rotate 86400 ./bin/log/rotate.sh >> /var/log/nginx-log-rotation.log 2>&1"
 
 if crontab -l 2>/dev/null | grep -qxF "$CRON_CMD"; then
     echo "Log rotation cron job already configured."

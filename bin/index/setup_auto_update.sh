@@ -14,7 +14,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 PROJECT_DIR="$(pwd)"
-CRON_CMD="0 2 1 * * cd '${PROJECT_DIR}' && ./bin/index/update.sh >> /var/log/photon-index-update.log 2>&1"
+CRON_CMD="0 2 1 * * cd '${PROJECT_DIR}' && ./bin/cron/run.sh index-update 2678400 ./bin/index/update.sh >> /var/log/photon-index-update.log 2>&1"
 
 if crontab -l 2>/dev/null | grep -qxF "$CRON_CMD"; then
     echo "Index update cron job already configured."
