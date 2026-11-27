@@ -23,7 +23,7 @@ set -uo pipefail
 #
 # REPORT_TOKEN and REPORT_URL in the environment take precedence over .env;
 # tests/cron-run.sh uses that. The same script as bin/cron/run.sh in
-# tiles.versatiles.org: keep both alike.
+# tiles.versatiles.org and status.versatiles.org: keep all three alike.
 
 cd "$(dirname "$0")/../.." || exit 1
 
